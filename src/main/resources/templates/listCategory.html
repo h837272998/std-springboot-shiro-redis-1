@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<table align='center' border='1' cellspacing='0'>
+    <tr>
+        <td>id</td>
+        <td>name</td>
+    </tr>
+    <tr th:each="c:${cs}">
+        <td th:text="${c.id}"></td>
+        <td th:text="${c.name}"></td>
+    </tr
+</table>
+</body>
+</html>
