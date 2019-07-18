@@ -1,5 +1,8 @@
 package com.hjh.springbootshiro2.controller;
 
+import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.session.Session;
+import org.apache.shiro.subject.Subject;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -14,6 +17,12 @@ public class PageController {
 
     @RequestMapping("index")
     public String index() {
+        Subject subject = SecurityUtils.getSubject();
+        //如果是记住我  则直接登录
+        if(subject.isRemembered()){
+            Session session = subject.getSession();
+            session.setAttribute("user",subject.getPrincipals().toString());
+        }
         return "index";
     }
 
@@ -42,5 +51,10 @@ public class PageController {
     @RequestMapping("unauthorized")
     public String noPerms() {
         return "unauthorized";
+    }
+
+    @RequestMapping("/kickout")
+    public String kickout(){
+        return "kickout";
     }
 }

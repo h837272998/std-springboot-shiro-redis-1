@@ -2,6 +2,7 @@ package com.hjh.springbootshiro2.service;
 
 import java.util.List;
 import com.hjh.springbootshiro2.pojo.User;
+import com.hjh.springbootshiro2.pojo.UserOnlineBo;
 
 public interface UserService {
 	public String getPassword(String name);
@@ -17,4 +18,6 @@ public interface UserService {
 	public User get(Long id);
 
 	public void update(User user);
+
+	public List<UserOnlineBo> onlineUser();
 }

@@ -6,14 +6,18 @@ import java.util.Map;
 
 import javax.servlet.Filter;
 
+import com.hjh.springbootshiro2.filter.KickoutSessionControlFilter;
 import com.hjh.springbootshiro2.filter.URLPathMatchingFilter;
 import com.hjh.springbootshiro2.realm.DatabaseRealm;
 import org.apache.shiro.authc.credential.HashedCredentialsMatcher;
+import org.apache.shiro.codec.Base64;
 import org.apache.shiro.mgt.SecurityManager;
 import org.apache.shiro.spring.LifecycleBeanPostProcessor;
 import org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor;
 import org.apache.shiro.spring.web.ShiroFilterFactoryBean;
+import org.apache.shiro.web.mgt.CookieRememberMeManager;
 import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
+import org.apache.shiro.web.servlet.SimpleCookie;
 import org.apache.shiro.web.session.mgt.DefaultWebSessionManager;
 import org.crazycake.shiro.RedisCacheManager;
 import org.crazycake.shiro.RedisManager;
@@ -64,15 +68,21 @@ public class ShiroConfiguration {
         Map<String,String> filterChainDefinitionMap = new LinkedHashMap<String,String>();
         //自定义拦截器
         Map<String, Filter> customisedFilter = new HashMap<>();
+        //URl权限管理
         customisedFilter.put("url", getURLPathMatchingFilter());
+        //同一个账号同时登陆数限制
+        customisedFilter.put("kickout", getKickoutSessionControlFilter());
 
         //配置映射关系
-        filterChainDefinitionMap.put("/login", "anon");
-        filterChainDefinitionMap.put("/index", "anon");
-        filterChainDefinitionMap.put("/static/**", "anon");
+        filterChainDefinitionMap.put("/login", "anon,kickout");
+        filterChainDefinitionMap.put("/index", "anon,kickout");
+        filterChainDefinitionMap.put("/static/**", "anon,kickout");
         filterChainDefinitionMap.put("/config/**", "anon");
-        filterChainDefinitionMap.put("/doLogout", "logout");;
-        filterChainDefinitionMap.put("/**", "url");
+        filterChainDefinitionMap.put("/getGifCode", "anon,kickout");
+        filterChainDefinitionMap.put("/kickout", "anon,kickout");
+        filterChainDefinitionMap.put("/doLogout", "logout,kickout");;
+        filterChainDefinitionMap.put("/**", "url,kickout");
+        filterChainDefinitionMap.put("/**", "kickout");
         shiroFilterFactoryBean.setFilters(customisedFilter);
         shiroFilterFactoryBean.setFilterChainDefinitionMap(filterChainDefinitionMap);
         return shiroFilterFactoryBean;
@@ -82,22 +92,49 @@ public class ShiroConfiguration {
         return new URLPathMatchingFilter();
     }
 
+
+    /**
+     * @Description:限制同个账号同时登陆人数
+     * @Author: HJH
+     * @Date: 2019-07-18 15:00
+     * @Param: []
+     * @Return: com.hjh.springbootshiro2.filter.KickoutSessionControlFilter
+     */
+    public KickoutSessionControlFilter getKickoutSessionControlFilter(){
+        KickoutSessionControlFilter kickoutSessionControlFilter = new KickoutSessionControlFilter();
+        //使用cacheManager获取相应的cache来缓存用户登录的会话；用于保存用户—会话之间的关系的；
+        //这里我们还是用之前shiro使用的redisManager()实现的cacheManager()缓存管理
+        //也可以重新另写一个，重新配置缓存时间之类的自定义缓存属性
+        kickoutSessionControlFilter.setCacheManager(getCacheManager());
+        //用于根据会话ID，获取会话进行踢出操作的；
+        kickoutSessionControlFilter.setSessionManager(getSessionManager());
+        //是否踢出后来登录的，默认是false；即后者登录的用户踢出前者登录的用户；踢出顺序。
+        kickoutSessionControlFilter.setKickoutAfter(false);
+        //同一个用户最大的会话数，默认1；比如2的意思是同一个用户允许最多同时两个人登录；
+        kickoutSessionControlFilter.setMaxSession(1);
+        //被踢出后重定向到的地址；
+        kickoutSessionControlFilter.setKickoutUrl("/kickout");
+        return kickoutSessionControlFilter;
+    }
+
     @Bean
-    public SecurityManager securityManager(){
+    public SecurityManager getSecurityManager(){
         DefaultWebSecurityManager securityManager =  new DefaultWebSecurityManager();
         //设置realm.
         securityManager.setRealm(getDatabaseRealm());
         //设置缓存 redis
-        securityManager.setCacheManager(cacheManager());
+        securityManager.setCacheManager(getCacheManager());
         //设置Session管理 使用redis
-        securityManager.setSessionManager(SessionManager());
+        securityManager.setSessionManager(getSessionManager());
+        //设置记住我
+        securityManager.setRememberMeManager(getRememberMeManager());
         return securityManager;
     }
 
     @Bean
     public DatabaseRealm getDatabaseRealm(){
         DatabaseRealm myShiroRealm = new DatabaseRealm();
-        myShiroRealm.setCredentialsMatcher(hashedCredentialsMatcher());
+        myShiroRealm.setCredentialsMatcher(getHashedCredentialsMatcher());
         return myShiroRealm;
     }
 
@@ -109,7 +146,7 @@ public class ShiroConfiguration {
      * @return
      */
     @Bean
-    public HashedCredentialsMatcher hashedCredentialsMatcher(){
+    public HashedCredentialsMatcher getHashedCredentialsMatcher(){
         HashedCredentialsMatcher hashedCredentialsMatcher = new HashedCredentialsMatcher();
 
         hashedCredentialsMatcher.setHashAlgorithmName("md5");//散列算法:这里使用MD5算法;
@@ -130,7 +167,7 @@ public class ShiroConfiguration {
      * @Param: []
      * @Return: org.crazycake.shiro.RedisManager
      */
-    public RedisManager redisManager(){
+    public RedisManager getRedisManager(){
         RedisManager redisManager = new RedisManager();
         redisManager.setHost(host);
         redisManager.setPort(port);
@@ -145,28 +182,60 @@ public class ShiroConfiguration {
      * @Param: []
      * @Return: org.crazycake.shiro.RedisCacheManager
      */
-    public RedisCacheManager cacheManager() {
+    public RedisCacheManager getCacheManager() {
         RedisCacheManager redisCacheManager = new RedisCacheManager();
-        redisCacheManager.setRedisManager(redisManager());
+        redisCacheManager.setRedisManager(getRedisManager());
         return redisCacheManager;
     }
 
     /**
      * RedisSessionDAO shiro sessionDao层的实现 通过redis
      */
-    public RedisSessionDAO redisSessionDAO() {
+    @Bean
+    public RedisSessionDAO getRedisSessionDAO() {
         RedisSessionDAO redisSessionDAO = new RedisSessionDAO();
-        redisSessionDAO.setRedisManager(redisManager());
+        redisSessionDAO.setRedisManager(getRedisManager());
         return redisSessionDAO;
     }
     /**
      * shiro session的管理
      */
-    public DefaultWebSessionManager SessionManager() {
+    public DefaultWebSessionManager getSessionManager() {
         DefaultWebSessionManager sessionManager = new DefaultWebSessionManager();
-        sessionManager.setSessionDAO(redisSessionDAO());
+        sessionManager.setSessionDAO(getRedisSessionDAO());
         return sessionManager;
     }
+    /**
+     * @Description:Cookie对象生成
+     * @Author: HJH
+     * @Date: 2019-07-18 9:04
+     * @Param: []
+     * @Return: org.apache.shiro.web.servlet.SimpleCookie
+     */
+    public SimpleCookie getRememberMeCookie(){
+        //cookie的名称。对应前端的checkbox的name rememberMe
+        SimpleCookie simpleCookie = new SimpleCookie("rememberMe");
+        //cookie生效时间
+        simpleCookie.setMaxAge(259200);
+        return simpleCookie;
+    }
+
+    /**
+     * @Description:CookieRememberMeManager,记住我功能额
+     * @Author: HJH
+     * @Date: 2019-07-18 9:06
+     * @Param: []
+     * @Return: org.apache.shiro.web.mgt.CookieRememberMeManager
+     */
+    public CookieRememberMeManager getRememberMeManager(){
+        CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
+
+        cookieRememberMeManager.setCookie(getRememberMeCookie());
+
+        cookieRememberMeManager.setCipherKey(Base64.decode("3AvVhmFLUs0KTA3Kprsdag=="));
+        return cookieRememberMeManager;
+    }
+
     /**
      *  开启shiro aop注解支持.
      *  使用代理方式;所以需要开启代码支持;

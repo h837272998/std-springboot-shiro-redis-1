@@ -9,6 +9,17 @@ public class User {
 
 	private String salt;
 
+    public User(User user) {
+    	this.setId(user.id);
+    	this.setName(user.name);
+    	this.setPassword(user.password);
+    	this.setSalt(user.salt);
+    }
+
+	public User() {
+
+	}
+
 	public Long getId() {
 		return id;
 	}

@@ -7,7 +7,7 @@
 </head>
 <body>
 <div class="workingroom">
-    权限不足,具体原因：<span th:text="${ex?.detailMessage}"></span>
+    权限不足,具体原因：<span th:text="${session.message}"></span>
     <br>
     <a href="#" onClick="javascript:history.back()">返回</a>
 </div>

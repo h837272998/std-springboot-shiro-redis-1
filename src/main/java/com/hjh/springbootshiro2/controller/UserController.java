@@ -2,11 +2,14 @@ package com.hjh.springbootshiro2.controller;
 
 import com.hjh.springbootshiro2.pojo.Role;
 import com.hjh.springbootshiro2.pojo.User;
+import com.hjh.springbootshiro2.pojo.UserOnlineBo;
 import com.hjh.springbootshiro2.service.RoleService;
 import com.hjh.springbootshiro2.service.UserRoleService;
 import com.hjh.springbootshiro2.service.UserService;
+import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.crypto.SecureRandomNumberGenerator;
 import org.apache.shiro.crypto.hash.SimpleHash;
+import org.apache.shiro.subject.Subject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -107,5 +110,13 @@ public class UserController {
         userService.add(u);
 
         return "redirect:listUser";
+    }
+
+
+    @RequestMapping("listOnline")
+    public String getListOnline(Model model){
+        List<UserOnlineBo> userOnlineBos = userService.onlineUser();
+        model.addAttribute("userOnline",userOnlineBos);
+        return "listOnline";
     }
 }

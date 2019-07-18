@@ -79,6 +79,12 @@
             <version>2.4.2.1-RELEASE</version>
 
         </dependency>
+
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+            <version>4.5.15</version>
+        </dependency>
     </dependencies>
 
     <build>

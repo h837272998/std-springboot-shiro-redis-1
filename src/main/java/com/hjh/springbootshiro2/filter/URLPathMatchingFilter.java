@@ -27,8 +27,8 @@ public class URLPathMatchingFilter extends PathMatchingFilter {
 		System.out.println("requestURI:" + requestURI);
 
 		Subject subject = SecurityUtils.getSubject();
-		// 如果没有登录，就跳转到登录页面
-		if (!subject.isAuthenticated()) {
+		// 如果没有登录和没有记住密码，就跳转到登录页面
+		if (!subject.isAuthenticated()&&!subject.isRemembered()) {
 			WebUtils.issueRedirect(request, response, "/login");
 			return false;
 		}
@@ -54,8 +54,7 @@ public class URLPathMatchingFilter extends PathMatchingFilter {
 				return true;
 			else {
 				UnauthorizedException ex = new UnauthorizedException("当前用户没有访问路径 " + requestURI + " 的权限");
-
-				subject.getSession().setAttribute("ex", ex);
+				subject.getSession().setAttribute("message", ex.getMessage());
 
 				WebUtils.issueRedirect(request, response, "/unauthorized");
 				return false;
